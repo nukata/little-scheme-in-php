@@ -1,7 +1,169 @@
 <?php
-// A little Scheme in PHP 7.1, v0.1 R02.03.15 by SUZUKI Hisao
+// A little Scheme in PHP 7.1, v0.2 R02.03.15/R02.03.21 by SUZUKI Hisao
 declare(strict_types=1);
 error_reporting(E_ALL);
+
+// Big integer by BC Math
+final class BigInt {
+    private $repr;              // String representaion of the integer
+
+    function __construct(string $repr) {
+        $this->repr = $repr;
+    }
+
+    function __toString() {
+        return $this->repr;
+    }
+
+    // $this + $other
+    function add(BigInt $other) {
+        $r = bcadd($this->repr, $other->repr, 0);
+        return self::normalize($r);
+    }
+
+    // $this - $other
+    function subtract(BigInt $other) {
+        $r = bcsub($this->repr, $other->repr, 0);
+        return self::normalize($r);
+    }
+
+    // $this * $other
+    function multiply(BigInt $other) {
+        $r = bcmul($this->repr, $other->repr, 0);
+        return self::normalize($r);
+    }
+
+    // $this <=> $other
+    function compare(BigInt $other): int {
+        return bccomp($this->repr, $other->repr, 0);
+    }
+
+    // Convert $this into a float
+    function toFloat(): float {
+        return $this->repr + 0.0;
+    }
+
+    // Convert a string into an int or a BigInt.
+    private static function normalize(string $repr) {
+        $n = $repr + 0;
+        if (is_int($n))
+            return $n;
+        return new BigInt($repr);
+    }
+
+    // Convert a string into an int, a BigInt, a float or itself.
+    static function fromString(string $token) {
+        if (is_numeric($token)) {
+            $n = $token + 0;
+            if (is_int($n)) {
+                return $n;
+            } else if (function_exists("bcadd") &&
+                       bcadd($token, "0", 0) === $token) {
+                return new BigInt($token);
+            } else {
+                assert(is_float($n));
+                return $n;
+            }
+        } else {
+            return $token;
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
+
+// $x + $y
+function add($x, $y) {
+    if (is_int($x) && is_int($y)) {
+        $n = $x + $y;         // PHP will produce a float on overflow.
+        if (is_int($n))
+            return $n;
+        return (new BigInt("${x}"))->add(new BigInt("${y}"));
+    } else if (is_float($x)) {
+        if ($y instanceof BigInt)
+            $y = $y->toFloat();
+        return $x + $y;
+    } else if (is_float($y)) {
+        if ($x instanceof BigInt)
+            $x = $x->toFloat();
+        return $x + $y;
+    } else {
+        if (is_int($x))
+            $x = new BigInt("${x}");
+        if (is_int($y))
+            $y = new BigInt("${y}");
+        return $x->add($y);
+    }
+}
+
+// $x - $y
+function subtract($x, $y) {
+    if (is_int($x) && is_int($y)) {
+        $n = $x - $y;         // PHP will produce a float on overflow.
+        if (is_int($n))
+            return $n;
+        return (new BigInt("${x}"))->subtract(new BigInt("${y}"));
+    } else if (is_float($x)) {
+        if ($y instanceof BigInt)
+            $y = $y->toFloat();
+        return $x - $y;
+    } else if (is_float($y)) {
+        if ($x instanceof BigInt)
+            $x = $x->toFloat();
+        return $x - $y;
+    } else {
+        if (is_int($x))
+            $x = new BigInt("${x}");
+        if (is_int($y))
+            $y = new BigInt("${y}");
+        return $x->subtract($y);
+    }
+}
+
+// $x * $y
+function multiply($x, $y) {
+    if (is_int($x) && is_int($y)) {
+        $n = $x * $y;         // PHP will produce a float on overflow.
+        if (is_int($n))
+            return $n;
+        return (new BigInt("${x}"))->multiply(new BigInt("${y}"));
+    } else if (is_float($x)) {
+        if ($y instanceof BigInt)
+            $y = $y->toFloat();
+        return $x * $y;
+    } else if (is_float($y)) {
+        if ($x instanceof BigInt)
+            $x = $x->toFloat();
+        return $x * $y;
+    } else {
+        if (is_int($x))
+            $x = new BigInt("${x}");
+        if (is_int($y))
+            $y = new BigInt("${y}");
+        return $x->multiply($y);
+    }
+}
+
+// $x <=> $y
+function compare($x, $y) {
+    if ($x instanceof BigInt) {
+        if (is_float($y))
+            return $x->toFloat() <=> $y;
+        if (is_int($y))
+            $y = new BigInt("${y}");
+        return $x->compare($y);
+    } else if ($y instanceof BigInt) {
+        if (is_float($x))
+            return $x <=> $y->toFloat();
+        if (is_int($x))
+            $x = new BigInt("${x}");
+        return $x->compare($y);
+    } else {
+        return $x <=> $y;
+    }
+}
+
+// ----------------------------------------------------------------------
 
 // Cons Cell
 final class Cell implements IteratorAggregate {
@@ -68,7 +230,7 @@ final class Sym extends NamedObject {
     }
 
     // Construct an interned symbol.
-    static function New(string $name): Sym {
+    static function interned(string $name): Sym {
         if (array_key_exists($name, self::$Symbols)) {
             return self::$Symbols[$name];
         }
@@ -78,14 +240,14 @@ final class Sym extends NamedObject {
     }
 }
 
-$QUOTE = Sym::New("quote");
-$IF = Sym::New("if");
-$BEGIN = Sym::New("begin");
-$LAMBDA = Sym::New("lambda");
-$DEFINE = Sym::New("define");
-$SETQ = Sym::New("set!");
-$APPLY = Sym::New("apply");
-$CALLCC = Sym::New("call/cc");
+$QUOTE = Sym::interned("quote");
+$IF = Sym::interned("if");
+$BEGIN = Sym::interned("begin");
+$LAMBDA = Sym::interned("lambda");
+$DEFINE = Sym::interned("define");
+$SETQ = Sym::interned("set!");
+$APPLY = Sym::interned("apply");
+$CALLCC = Sym::interned("call/cc");
 
 // ----------------------------------------------------------------------
 
@@ -304,7 +466,7 @@ function stringify($exp, bool $quote=TRUE): string {
 // ----------------------------------------------------------------------
 
 function c(string $name, int $arity, callable $fun, ?Environment $next) {
-    return new Environment(Sym::New($name),
+    return new Environment(Sym::interned($name),
                            new Intrinsic($name, $arity, $fun),
                            $next);
 }
@@ -331,8 +493,9 @@ Environment::$Global = new Environment(
     }, c("eqv?", 2, function($x) {
         $a = $x->car;
         $b = $x->cdr->car;
-        if (is_numeric($a) && is_numeric($b)) {
-            return $a == $b;
+        if ((is_numeric($a) || $a instanceof BigInt) &&
+            (is_numeric($b) || $b instanceof BigInt)) {
+            return compare($a, $b) == 0;
         } else {
             return $a === $b;
         }
@@ -360,15 +523,15 @@ Environment::$Global = new Environment(
     }, c("symbol?", 1, function($x) {
         return $x->car instanceof Sym;
     }, c("+", 2, function($x) {
-        return $x->car + $x->cdr->car;
+        return add($x->car, $x->cdr->car);
     }, c("-", 2, function($x) {
-        return $x->car - $x->cdr->car;
+        return subtract($x->car, $x->cdr->car);
     }, c("*", 2, function($x) {
-        return $x->car * $x->cdr->car;
+        return multiply($x->car, $x->cdr->car);
     }, c("<", 2, function($x) {
-        return $x->car < $x->cdr->car;
+        return compare($x->car, $x->cdr->car) < 0;
     }, c("=", 2, function($x) {
-        return $x->car == $x->cdr->car;
+        return compare($x->car, $x->cdr->car) == 0;
     }, c("error", 2, function($x) {
         throw new SchemeErrorException($x->car, $x->cdr->car);
     }, c("globals", 0, function($x) {
@@ -527,7 +690,7 @@ function apply_function($fun, ?Cell $arg, Continuation $k, Environment $env) {
         $k->pushRestoreEnv($env);
         $k->push(OP_BEGIN, $fun->body);
         return [$NONE,
-                new Environment(NULL, // frame maker
+                new Environment(NULL, // frame marker
                                 NULL,
                                 $fun->env->prependDefs($fun->params, $arg))];
     } else if ($fun instanceof Continuation) {
@@ -612,9 +775,9 @@ function read_from_tokens(array &$tokens) {
     if ($token[0] == '"') {
         return substr($token, 1);
     } else if (is_numeric($token)) {
-        return $token + 0;      // "1.0" -> float, "1" -> int
+        return BigInt::fromString($token); // "1.0" -> float, "1" -> int
     } else {
-        return Sym::New($token);
+        return Sym::interned($token);
     }
 }
 

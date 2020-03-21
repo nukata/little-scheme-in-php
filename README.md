@@ -1,8 +1,9 @@
 # A Little Scheme in PHP 7
 
 This is a small interpreter of a subset of Scheme written in PHP 7.1.
-It implements _almost_ the same language as
+It implements the same language as
 
+- [little-scheme-in-crystal](https://github.com/nukata/little-scheme-in-crystal)
 - [little-scheme-in-cs](https://github.com/nukata/little-scheme-in-cs)
 - [little-scheme-in-dart](https://github.com/nukata/little-scheme-in-dart)
 - [little-scheme-in-go](https://github.com/nukata/little-scheme-in-go)
@@ -13,7 +14,6 @@ It implements _almost_ the same language as
 
 and their meta-circular interpreter, 
 [little-scheme](https://github.com/nukata/little-scheme).
-It differs from the others above in that it does _not_ have _bignum_ _arithmetic_.
 
 As a Scheme implementation, 
 it optimizes _tail calls_ and handles _first-class continuations_ properly.
@@ -82,18 +82,18 @@ list not null? pair? eqv? eq? cons cdr car fibonacci)
 > (fibonacci 16)
 987
 > (fibonacci 1000)
-4.3466557686937E+208
+43466557686937456435688527675040625802564660517371780402481729089536555417949051
+89040387984007925516929592259308032263477520968962323987332247116164299644090653
+3187938298969649928516003704476137795166849228875
 > 
 ```
-
-Note that it does not have bignum arithmetic.
 
 
 ## The implemented language
 
 | Scheme Expression                   | Internal Representation             |
 |:------------------------------------|:------------------------------------|
-| numbers `1`, `2.3`                  | `int` or `float`                    |
+| numbers `1`, `2.3`                  | `int`, `float` or `class BigInt`    |
 | `#t`                                | `TRUE`                              |
 | `#f`                                | `FALSE`                             |
 | strings `"hello, world"`            | `string`                            |
@@ -103,6 +103,8 @@ Note that it does not have bignum arithmetic.
 | closures `(lambda (x) (+ x 1))`     | `class SchemeClosure`               |
 | built-in procedures `car`, `cdr`    | `class Intrinsic`                   |
 | continuations                       | `class Continuation`                |
+
+- `class BigInt` uses `BC Math` internally.
 
 
 ### Expression types
@@ -148,8 +150,8 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 - `(globals)` returns a list of keys of the global environment.
   It is not in the standard.
 
-See [`Environment::$Global`](scm.php#L320-L379)
+See [`Environment::$Global`](scm.php#L482-L542)
 in `scm.php` for the implementation of the procedures
 except `call/cc` and `apply`.  
 `call/cc` and `apply` are implemented particularly at 
-[`apply_function`](scm.php#L502-L541) in `scm.php`.
+[`apply_function`](scm.php#L665-L704) in `scm.php`.
