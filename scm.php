@@ -1,5 +1,5 @@
 <?php
-// A little Scheme in PHP 7.1, v0.2 R02.03.15/R02.03.21 by SUZUKI Hisao
+// A Little Scheme in PHP 7.1, v0.3 R02.03.15/R02.04.12 by SUZUKI Hisao
 declare(strict_types=1);
 error_reporting(E_ALL);
 
@@ -221,6 +221,12 @@ $NONE = new NamedObject ("#<VOID>");
 // A unique value which means the End Of File
 $EOF = new NamedObject ("#<EOF>");
 
+// A unique value which represents the call/cc procedure
+$CALLCC_OBJ = new NamedObject ("#<call/cc>");
+
+// A unique value which represents the apply procedure
+$APPLY_OBJ = new NamedObject ("#<apply>");
+
 // Scheme's symbol
 final class Sym extends NamedObject {
     private static $Symbols = []; // Table of the interned symbols
@@ -274,9 +280,13 @@ final class Environment implements IteratorAggregate {
 
     // Search the bindings for a symbol.
     function lookFor(Sym $symbol): Environment {
-        foreach ($this as $env)
+        $env = $this;
+        while (! is_null($env)) {
             if ($env->symbol === $symbol) // compare the identities.
                 return $env;
+            $env = $env->next;
+        }
+        // foreach ($this as $env) ... is slow.
         throw new LogicException("'${symbol}' not found");
     }
 
@@ -490,15 +500,6 @@ Environment::$Global = new Environment(
         return new Cell($x->car, $x->cdr->car);
     }, c("eq?", 2, function($x) {
         return $x->car === $x->cdr->car;
-    }, c("eqv?", 2, function($x) {
-        $a = $x->car;
-        $b = $x->cdr->car;
-        if ((is_numeric($a) || $a instanceof BigInt) &&
-            (is_numeric($b) || $b instanceof BigInt)) {
-            return compare($a, $b) == 0;
-        } else {
-            return $a === $b;
-        }
     }, c("pair?", 1, function($x) {
         return $x->car instanceof Cell;
     }, c("null?", 1, function($x) {
@@ -522,7 +523,9 @@ Environment::$Global = new Environment(
         return $x->car === $EOF;
     }, c("symbol?", 1, function($x) {
         return $x->car instanceof Sym;
-    }, c("+", 2, function($x) {
+    }, new Environment($CALLCC, $CALLCC_OBJ,
+       new Environment($APPLY, $APPLY_OBJ,
+       c("+", 2, function($x) {
         return add($x->car, $x->cdr->car);
     }, c("-", 2, function($x) {
         return subtract($x->car, $x->cdr->car);
@@ -532,14 +535,13 @@ Environment::$Global = new Environment(
         return compare($x->car, $x->cdr->car) < 0;
     }, c("=", 2, function($x) {
         return compare($x->car, $x->cdr->car) == 0;
+    }, c("number?", 1, function($x) {
+        return is_numeric($x->car) || $x->car instanceof BigInt;
     }, c("error", 2, function($x) {
         throw new SchemeErrorException($x->car, $x->cdr->car);
     }, c("globals", 0, function($x) {
         return globals();
-    }, new Environment(
-        $CALLCC, $CALLCC,
-        new Environment(
-            $APPLY, $APPLY, NULL))))))))))))))))))))))));
+    }, NULL))))))))))))))))))))))));
 
 // ----------------------------------------------------------------------
 
@@ -664,13 +666,13 @@ function evaluate($exp, Environment $env) {
 
 // Apply a function to arguments with a continuation and an environment.
 function apply_function($fun, ?Cell $arg, Continuation $k, Environment $env) {
-    global $NONE, $APPLY, $CALLCC;
+    global $NONE, $APPLY_OBJ, $CALLCC_OBJ;
     for (;;) {
-        if ($fun === $CALLCC) {
+        if ($fun === $CALLCC_OBJ) {
             $k->pushRestoreEnv($env);
             $fun = $arg->car;
             $arg = new Cell(new Continuation($k), NULL);
-        } else if ($fun === $APPLY) {
+        } else if ($fun === $APPLY_OBJ) {
             $fun = $arg->car;
             $arg = $arg->cdr->car;
         } else {
