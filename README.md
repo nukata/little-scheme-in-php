@@ -1,6 +1,6 @@
-# A Little Scheme in PHP 7
+# A Little Scheme in PHP 7 and 8
 
-This is a small interpreter of a subset of Scheme written in PHP 7.1.
+This is a small interpreter of a subset of Scheme written in PHP; it runs on both PHP 7.3 and 8.2.
 It implements almost the same language as
 
 - [little-scheme-in-crystal](https://github.com/nukata/little-scheme-in-crystal)

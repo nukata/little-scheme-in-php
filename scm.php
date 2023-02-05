@@ -1,5 +1,5 @@
 <?php
-// A Little Scheme in PHP 7.1, v0.3 R02.03.15/R02.04.12 by SUZUKI Hisao
+// A Little Scheme in PHP 7/8, v0.3 R02.03.15/R05.02.05 by SUZUKI Hisao
 declare(strict_types=1);
 error_reporting(E_ALL);
 
@@ -78,7 +78,7 @@ function add($x, $y) {
         $n = $x + $y;         // PHP will produce a float on overflow.
         if (is_int($n))
             return $n;
-        return (new BigInt("${x}"))->add(new BigInt("${y}"));
+        return (new BigInt("{$x}"))->add(new BigInt("{$y}"));
     } else if (is_float($x)) {
         if ($y instanceof BigInt)
             $y = $y->toFloat();
@@ -89,9 +89,9 @@ function add($x, $y) {
         return $x + $y;
     } else {
         if (is_int($x))
-            $x = new BigInt("${x}");
+            $x = new BigInt("{$x}");
         if (is_int($y))
-            $y = new BigInt("${y}");
+            $y = new BigInt("{$y}");
         return $x->add($y);
     }
 }
@@ -102,7 +102,7 @@ function subtract($x, $y) {
         $n = $x - $y;         // PHP will produce a float on overflow.
         if (is_int($n))
             return $n;
-        return (new BigInt("${x}"))->subtract(new BigInt("${y}"));
+        return (new BigInt("{$x}"))->subtract(new BigInt("{$y}"));
     } else if (is_float($x)) {
         if ($y instanceof BigInt)
             $y = $y->toFloat();
@@ -113,9 +113,9 @@ function subtract($x, $y) {
         return $x - $y;
     } else {
         if (is_int($x))
-            $x = new BigInt("${x}");
+            $x = new BigInt("{$x}");
         if (is_int($y))
-            $y = new BigInt("${y}");
+            $y = new BigInt("{$y}");
         return $x->subtract($y);
     }
 }
@@ -126,7 +126,7 @@ function multiply($x, $y) {
         $n = $x * $y;         // PHP will produce a float on overflow.
         if (is_int($n))
             return $n;
-        return (new BigInt("${x}"))->multiply(new BigInt("${y}"));
+        return (new BigInt("{$x}"))->multiply(new BigInt("{$y}"));
     } else if (is_float($x)) {
         if ($y instanceof BigInt)
             $y = $y->toFloat();
@@ -137,9 +137,9 @@ function multiply($x, $y) {
         return $x * $y;
     } else {
         if (is_int($x))
-            $x = new BigInt("${x}");
+            $x = new BigInt("{$x}");
         if (is_int($y))
-            $y = new BigInt("${y}");
+            $y = new BigInt("{$y}");
         return $x->multiply($y);
     }
 }
@@ -150,13 +150,13 @@ function compare($x, $y) {
         if (is_float($y))
             return $x->toFloat() <=> $y;
         if (is_int($y))
-            $y = new BigInt("${y}");
+            $y = new BigInt("{$y}");
         return $x->compare($y);
     } else if ($y instanceof BigInt) {
         if (is_float($x))
             return $x <=> $y->toFloat();
         if (is_int($x))
-            $x = new BigInt("${x}");
+            $x = new BigInt("{$x}");
         return $x->compare($y);
     } else {
         return $x <=> $y;
@@ -176,7 +176,7 @@ final class Cell implements IteratorAggregate {
     }
 
     // Yield car, cadr, caddr and so on.
-    function getIterator() {
+    function getIterator(): Iterator {
         $j = $this;
         while ($j instanceof Cell) {
             yield $j->car;
@@ -270,7 +270,7 @@ final class Environment implements IteratorAggregate {
     }
 
     // Yield each binding.
-    function getIterator() {
+    function getIterator(): Iterator {
         $env = $this;
         while (! is_null($env)) {
             yield $env;
@@ -287,7 +287,7 @@ final class Environment implements IteratorAggregate {
             $env = $env->next;
         }
         // foreach ($this as $env) ... is slow.
-        throw new LogicException("'${symbol}' not found");
+        throw new LogicException("'{$symbol}' not found");
     }
 
     // Build a new environment by prepending the bindings of symbols and data
@@ -298,12 +298,12 @@ final class Environment implements IteratorAggregate {
                 return $this;
             } else {
                 $s = stringify($data);
-                throw new InvalidArgumentException("surplus arg: ${s}");
+                throw new InvalidArgumentException("surplus arg: {$s}");
             }
         } else {
             if (is_null($data)) {
                 $s = stringify($symbols);
-                throw new InvalidArgumentException("surplus param: ${s}");
+                throw new InvalidArgumentException("surplus param: {$s}");
             } else {
                 $rest = $this->prependDefs($symbols->cdr, $data->cdr);
                 return new Environment($symbols->car, $data->car, $rest);
@@ -470,7 +470,7 @@ function stringify($exp, bool $quote=TRUE): string {
             $s = sprintf("%.1f", $exp);
         return $s;
     }
-    return "${exp}";
+    return "{$exp}";
 }
 
 // ----------------------------------------------------------------------
@@ -642,12 +642,12 @@ function evaluate($exp, Environment $env) {
                     } else if ($op === OP_APPLYFUN) { // $exp is a function.
                         [$exp, $env] = apply_function($exp, $args, $k, $env);
                     } else {
-                        throw new UnexpectedValueException("${op}; ${exp}");
+                        throw new UnexpectedValueException("{$op}; {$exp}");
                     }
                 } else if ($op === OP_RESTOREENV) { // $x is an Environment.
                     $env = $x;
                 } else {
-                    throw new UnexpectedValueException("${op}, ${x}");
+                    throw new UnexpectedValueException("{$op}, {$x}");
                 }
             }
         }
